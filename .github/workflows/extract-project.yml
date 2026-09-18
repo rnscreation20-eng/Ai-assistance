@@ -1,0 +1,57 @@
+name: Extract Project ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'aura-ai-phase1.zip'
+
+permissions:
+  contents: write
+
+jobs:
+  extract-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract project files
+        shell: bash
+        run: |
+          set -e
+          rm -rf /tmp/aura-extract
+          mkdir -p /tmp/aura-extract
+          unzip -q aura-ai-phase1.zip -d /tmp/aura-extract
+
+          root_dir="/tmp/aura-extract"
+          if [ -d "/tmp/aura-extract/aura-ai" ]; then
+            root_dir="/tmp/aura-extract/aura-ai"
+          fi
+
+          shopt -s dotglob
+          for item in "$root_dir"/*; do
+            name="$(basename "$item")"
+            if [ "$name" != ".git" ]; then
+              rm -rf "./$name"
+              cp -a "$item" "./$name"
+            fi
+          done
+
+          rm -f aura-ai-phase1.zip
+
+      - name: Commit extracted files
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Extract AURA AI project files from ZIP"
+            git push
+          fi
