@@ -1,4 +1,4 @@
-name: Extract Project ZIP
+name: Extract Project ZIP and Build APK
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  extract-and-commit:
+  extract-build-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,13 +34,30 @@ jobs:
           shopt -s dotglob
           for item in "$root_dir"/*; do
             name="$(basename "$item")"
-            if [ "$name" != ".git" ]; then
+            # Do not copy nested GitHub workflow files because the connected GitHub App
+            # does not have the workflows permission. This workflow performs the build.
+            if [ "$name" != ".git" ] && [ "$name" != ".github" ]; then
               rm -rf "./$name"
               cp -a "$item" "./$name"
             fi
           done
 
           rm -f aura-ai-phase1.zip
+          chmod +x ./gradlew
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -e
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-ai-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Commit extracted files
         shell: bash
